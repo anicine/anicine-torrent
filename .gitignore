@@ -1,0 +1,7 @@
+/anicine-torrent-*
+/build/*
+/cert/*
+*.json
+*.html
+*.env*
+*.db
