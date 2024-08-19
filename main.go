@@ -113,7 +113,7 @@ func main() {
 		return ns.Start(ctx)
 	})
 	group.Go(func() error {
-		if config.CertFile != "" || config.KeyFile != "" {
+		if config.CertFile != "" && config.KeyFile != "" {
 			return server.ListenAndServeTLS(config.CertFile, config.KeyFile)
 		}
 		return server.ListenAndServe()
