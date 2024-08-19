@@ -3,5 +3,5 @@
 /cert/*
 *.json
 *.html
-*.env*
+.env*
 *.db*
