@@ -71,34 +71,19 @@ func Do(ctx context.Context, args Args) (*http.Response, error) {
 		logger.Info("accepted response", "link", args.Endpoint, "code", resp.StatusCode)
 
 		switch resp.StatusCode {
-		case http.StatusOK:
+		case http.StatusOK, http.StatusNotModified:
 			return resp, nil
-		case http.StatusNotModified:
-			return resp, nil
-		case http.StatusNotFound:
+		case http.StatusNotFound, http.StatusBadRequest:
 			defer resp.Body.Close()
 			return nil, ErrNotFound
-		case http.StatusBadRequest:
-			defer resp.Body.Close()
-			return nil, ErrNotFound
-		case http.StatusFound:
+		case http.StatusFound, http.StatusMovedPermanently:
 			endpoint, err := url.Parse(resp.Header.Get("Location"))
 			if err != nil {
 				return nil, ErrNotFound
 			}
 			args.Endpoint = endpoint
 			continue
-		case http.StatusMovedPermanently:
-			endpoint, err := url.Parse(resp.Header.Get("Location"))
-			if err != nil {
-				return nil, ErrNotFound
-			}
-			args.Endpoint = endpoint
-			continue
-		case http.StatusForbidden:
-			time.Sleep(350 * time.Millisecond)
-			continue
-		case http.StatusTooManyRequests:
+		case http.StatusTooManyRequests, http.StatusForbidden:
 			time.Sleep(30 * time.Second)
 			continue
 		}
