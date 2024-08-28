@@ -44,6 +44,14 @@ func main() {
 		Timeout: time.Duration(30 * time.Second),
 	}
 
+	trackers, err := nyaa.Load(config.TrackersFile)
+	if err != nil {
+		slog.Error("cannot read the trackers from the file", "error", err)
+		os.Exit(1)
+	}
+
+	slog.Info("trackers was loaded successfully", "number", len(trackers))
+
 	client.SetProxy(proxy)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -75,7 +83,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	ns := nyaa.NewNyaa(slog.Default().WithGroup("[NYAA]"), db.Database("anicine-torrent"), bitTorrent)
+	ns := nyaa.NewNyaa(slog.Default().WithGroup("[NYAA]"), db.Database("anicine-torrent"), bitTorrent, trackers)
 
 	ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
 	if err = ns.Init(ctx); err != nil {

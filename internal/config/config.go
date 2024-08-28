@@ -9,10 +9,11 @@ import (
 )
 
 type Config struct {
-	MongoDB  string
-	Proxy    string
-	CertFile string
-	KeyFile  string
+	MongoDB      string
+	Proxy        string
+	CertFile     string
+	KeyFile      string
+	TrackersFile string
 }
 
 func Load(path string) (*Config, error) {
@@ -46,9 +47,14 @@ func Load(path string) (*Config, error) {
 		switch key {
 		case "MONGO_DB_URL":
 			if value == "" {
-				return nil, errors.New("you need to set the Mongo DB url")
+				return nil, errors.New("you need to set the Mongo DB URL")
 			}
 			config.MongoDB = value
+		case "TRACKERS_FILE":
+			if value == "" {
+				return nil, errors.New("you need to set the path to trackers URLs file")
+			}
+			config.TrackersFile = value
 		case "PROXY_URL":
 			config.Proxy = value
 		case "CERT_FILE":

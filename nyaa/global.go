@@ -1,10 +1,12 @@
 package nyaa
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -19,86 +21,59 @@ import (
 
 var (
 	ErrMissingSeeders = errors.New("missing seeders")
-	trackers          = []string{
-		"http://125.227.35.196:6969/announce",
-		"http://210.244.71.25:6969/announce",
-		"http://210.244.71.26:6969/announce",
-		"http://213.159.215.198:6970/announce",
-		"http://37.19.5.139:6969/announce",
-		"http://37.19.5.155:6881/announce",
-		"http://46.4.109.148:6969/announce",
-		"http://87.248.186.252:8080/announce",
-		"http://anidex.moe:6969/announce",
-		"http://asmlocator.ru:34000/1hfZS1k4jh/announce",
-		"http://bt.evrl.to/announce",
-		"http://bt.rutracker.org/ann",
-		"http://mgtracker.org:6969/announce",
-		"http://nyaa.tracker.wf:7777/announce",
-		"http://pubt.net:2710/announce",
-		"http://tracker.acgnx.se/announce",
-		"http://tracker.baravik.org:6970/announce",
-		"http://tracker.dler.org:6969/announce",
-		"http://tracker.filetracker.pl:8089/announce",
-		"http://tracker.grepler.com:6969/announce",
-		"http://tracker.mg64.net:6881/announce",
-		"http://tracker.openbittorrent.com:80/announce",
-		"http://tracker.tiny-vps.com:6969/announce",
-		"http://tracker.torrentyorg.pl/announce",
-		"https://computer1.sitelio.me/",
-		"https://internet.sitelio.me/",
-		"https://opentracker.i2p.rocks:443/announce",
-		"https://www.artikelplanet.nl",
-		"udp://168.235.67.63:6969",
-		"udp://182.176.139.129:6969",
-		"udp://37.19.5.155:2710",
-		"udp://46.148.18.250:2710",
-		"udp://46.4.109.148:6969",
-		"udp://allerhandelenlaag.nl",
-		"udp://c3t.org",
-		"udp://computerbedrijven.bestelinks.nl/",
-		"udp://computerbedrijven.startsuper.nl/",
-		"udp://computershop.goedbegin.nl/",
-		"udp://coppersurfer.tk:6969/announce",
-		"udp://exodus.desync.com:6969",
-		"udp://exodus.desync.com:6969/announce",
-		"udp://ipv4.tracker.harry.lu:80/announce",
-		"udp://open.demonii.com:1337/announce",
-		"udp://open.stealth.si:80/announce",
-		"udp://open.tracker.cl:1337/announce",
-		"udp://opentracker.i2p.rocks:6969/announce",
-		"udp://p4p.arenabg.com:1337/announce",
-		"udp://public.popcorn-tracker.org:6969/announce",
-		"udp://tracker.bittor.pw:1337/announce",
-		"udp://tracker.dler.org:6969/announce",
-		"udp://tracker.internetwarriors.net:1337/announce",
-		"udp://tracker.leechers-paradise.org:6969/announce",
-		"udp://tracker.openbittorrent.com:80",
-		"udp://tracker.opentrackr.org:1337",
-		"udp://tracker.opentrackr.org:1337/announce",
-		"udp://tracker.publicbt.com:80",
-		"udp://tracker.tiny-vps.com:6969",
-		"udp://tracker.torrent.eu.org:451/announce",
-		"udp://tracker.zer0day.to:1337/announc",
-	}
 )
 
-func (s *Nyaa) extract(ctx context.Context, magnet string) ([]*torrent.File, error) {
-	torrent, err := s.client.AddMagnet(magnet)
+func Load(path string) ([]string, error) {
+	_, err := os.Stat(path)
 	if err != nil {
 		return nil, err
 	}
 
-	torrent.AddTrackers([][]string{trackers})
-	torrent.DisallowDataUpload()
-	torrent.DisallowDataDownload()
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var (
+		trackers []string
+		scanner  = bufio.NewScanner(file)
+	)
+
+	for scanner.Scan() {
+		txt := strings.TrimSpace(scanner.Text())
+		if txt == "" || txt == "\n" || txt == "\t" {
+			continue
+		}
+
+		uri, err := url.Parse(txt)
+		if err != nil {
+			return nil, err
+		}
+
+		trackers = append(trackers, uri.String())
+	}
+
+	return trackers, nil
+}
+
+func (s *Nyaa) extract(ctx context.Context, uri string) ([]*torrent.File, error) {
+	magnet, err := s.client.AddMagnet(uri)
+	if err != nil {
+		return nil, err
+	}
+
+	magnet.AddTrackers([][]string{s.trackers})
+	magnet.DisallowDataUpload()
+	magnet.DisallowDataDownload()
 
 	now := time.Now()
 	for {
 		select {
 		case <-ctx.Done():
 			return nil, context.Canceled
-		case <-torrent.GotInfo():
-			files := torrent.Files()
+		case <-magnet.GotInfo():
+			files := magnet.Files()
 			return files, err
 		default:
 			if time.Since(now) > time.Second*90 {
